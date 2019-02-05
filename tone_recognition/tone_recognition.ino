@@ -1,13 +1,52 @@
 //Libraries
 #include <LiquidCrystal.h>
+#include <SPI.h>
+#include <SD.h>
+#include <FHT.h>
 
 //Global Variables
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+LiquidCrystal lcd(12, 11, 6, 5, 3, 2);
+int vibMotor = 13;
+int mic = A0;
+//delta timing variables
 unsigned long displayTime = 0;
 bool disp = false;
+//SD card variables
+File myFile;
+
 
 void setup() {
-  lcd.begin(16, 2);
+  Serial.begin(9600); //begin serial connection
+  lcd.begin(16, 2); //start lcd
+  //Initialize I/O
+  pinMode(vibMotor, OUTPUT);
+  pinMode(mic, INPUT);
+  //Initilize SD Card
+  SD.begin(4);
+
+  /*
+  //Write to a file
+  myFile = SD.open("test.txt", FILE_WRITE);
+  if (myFile) {
+    myFile.println("testing 1, 2, 3.");
+    myFile.close();
+  } 
+  else {
+    Serial.println("error opening file");
+  }
+
+  //Read from a file
+  myFile = SD.open("test.txt");
+  if (myFile) {
+    while (myFile.available()) {
+      Serial.write(myFile.read());
+    }
+    myFile.close();
+  } 
+  else {
+    Serial.println("error opening file");
+  }
+  */ 
 }
 
 void loop() {
