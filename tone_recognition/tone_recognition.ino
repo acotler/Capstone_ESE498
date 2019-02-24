@@ -1,6 +1,6 @@
 //Libraries
 #include <LiquidCrystal.h>
-//#include <SPI.h>
+#include <SPI.h>
 #include <SD.h>
 #include <FHT.h>
 
@@ -8,6 +8,10 @@
 LiquidCrystal lcd(8, 7, 6, 5, 3, 2);
 int vibMotor = 9;
 int mic = A5;
+
+int maxVals[5] = {0, 0, 0, 0, 0};
+int sampleVal = 0;
+
 //delta timing variables
 unsigned long displayTime = 0;
 bool disp = false;
@@ -66,19 +70,61 @@ void setup() {
   Serial.begin(9600); //begin serial connection
   //Initialize I/O
   pinMode(vibMotor, OUTPUT);
-  pinMode(mic, INPUT);
+  //pinMode(mic, INPUT);
   //Initilize LCD
-  lcd.begin(16, 2); //start lcd
-  lcd.clear();
+  //lcd.begin(16, 2); //start lcd
+  //lcd.clear();
   //Initilize SD Card
-  SD.begin(4);
+  //SD.begin(4);  
+}
 
+void loop() {
+  state = nextState(state);
   
+  switch(state){
+    case dataAquisition:
+      if(millis()-sampleTime >= 1){
+        //sampleVal = analogRead(mic);
+        
+        for(int j=4; j>=0; j--){
+          if(sampleVal>maxVals[j]){
+            for(int k=0; k<j+1; k++){
+              maxVals[k] = maxVals[k+1];
+            }
+            maxVals[j] = sampleVal;
+            break;
+          }
+        }
+        Serial.println(analogRead(mic));
+        sampleTime = millis();
+      }
+      if(millis()-displayTime>500){
+        Serial.print("{");
+        for(int i=0; i<5; i++){
+          Serial.print(maxVals[i]);
+          if(i<4){
+            Serial.print(", "); 
+          }
+        }
+        Serial.println("}");
+        displayTime = millis();
+      }
+      //toneDetected = true;
+      break;
+    case FHTProcessing: //Take FHT and compare to files
+      break;       
+    case recordTone: //Record new tones to a file
+      break;
+  }
+}
+
+/*
   //Write to a file
   myFile = SD.open("test.csv", FILE_WRITE);
   myFile.print(0);
   myFile.println(",");
   delay(5000);
+  */
   /*if (myFile) {
     myFile.println("This is a test...");
     myFile.close();
@@ -98,53 +144,8 @@ void setup() {
   else {
     Serial.println("error opening file");
   }*/
-
-  
-}
-
-void loop() {
-  /*if(i<500){
-    myFile.print(micros());
-    myFile.println("");
-    i++;
-  }
-  else {
-    myFile.close();
-  }*/
-  
-  if(millis()<15000){
-
-    //if(micros()-sampleTime > 6000){
-      
-      myFile.print(analogRead(mic));
-      myFile.println(",");
-      sampleTime = micros();
-      //Serial.println(analogRead(mic));
-      delayMicroseconds(400);
-    //}
-  }
-  else {
-    myFile.close();
-  }
   
   /*
-  state = nextState(state);
-  
-  switch(state){
-    case dataAquisition: //take 256 samples and see if tone detected
-      if(millis()-sampleTime >= 100){
-        //store sample
-        sampleTime = millis();
-      }
-      //toneDetected = true;
-      break;
-    case FHTProcessing: //Take FHT and compare to files
-      break;       
-    case recordTone: //Record new tones to a file
-      break;
-  }
-  
-  
   if(millis()-displayTime >= 1000){
     lcd.clear();
     if(disp){
@@ -162,9 +163,7 @@ void loop() {
     disp = !disp;
     displayTime = millis();
   }
-  */
-}
-
+*/
 
 
 
