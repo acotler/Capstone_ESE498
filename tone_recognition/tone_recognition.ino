@@ -1,30 +1,39 @@
 //Libraries
 #include <LiquidCrystal.h>
 #include <SPI.h>
-#include <SD.h>
-#include <FHT.h>
+//#include <SD.h>
+#include <arduinoFFT.h>
+#include <math.h>
 
 //Global Variables
 LiquidCrystal lcd(8, 7, 6, 5, 3, 2);
 int vibMotor = 9;
 int mic = A5;
 
-int maxVals[5] = {0, 0, 0, 0, 0};
-int sampleVal = 0;
-
-//delta timing variables
-unsigned long displayTime = 0;
-bool disp = false;
-unsigned long sampleTime = 0;
 //SD card variables
-File myFile;
+//File myFile;
 //FSM Variables
 enum State { dataAquisition, FHTProcessing, recordTone };
 State state = dataAquisition;
+
 bool toneDetected = false;
 bool FHTProcDone = true;
 bool shouldRecordTone = false;
 bool recordingTone = false;
+
+//FFT Sampling Variables
+const uint16_t samples = 128;
+const double samplingFrequency = 8000;
+
+double maxVals[2] = {0,0};
+double lastX = 0.0;
+
+double vReal[samples];
+double vImag[samples];
+
+arduinoFFT FFT = arduinoFFT(vReal, vImag, samples, samplingFrequency); /* Create FFT object */
+
+int i = 0;
 
 
 //A function to determine state transitions
@@ -66,14 +75,18 @@ State nextState(State currentState){
   }
 }
 
+double distance(double x1, double x2){
+  return abs(x2-x1);
+}
+
+
 void setup() {
-  Serial.begin(9600); //begin serial connection
+  Serial.begin(115200); //begin serial connection
   //Initialize I/O
   pinMode(vibMotor, OUTPUT);
-  //pinMode(mic, INPUT);
   //Initilize LCD
-  //lcd.begin(16, 2); //start lcd
-  //lcd.clear();
+  lcd.begin(16, 2); //start lcd
+  lcd.clear();
   //Initilize SD Card
   //SD.begin(4);  
 }
@@ -83,32 +96,48 @@ void loop() {
   
   switch(state){
     case dataAquisition:
-      if(millis()-sampleTime >= 1){
-        //sampleVal = analogRead(mic);
+      if(i<128){
+        vReal[i] = analogRead(A5);
+        vImag[i] = 0.0;
+        i++;
+        delayMicroseconds(130);
+      }
+      else {
+        FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  /* Weigh data */
+        FFT.Compute(vReal, vImag, samples, FFT_FORWARD); /* Compute FFT */
+        FFT.ComplexToMagnitude(vReal, vImag, samples); /* Compute magnitudes */
+        FFT.DCRemoval(vReal, samples);
+
+        for(int j=0; j<128; j++){
+          Serial.print(vReal[j]);
+          if(i!=127){
+            Serial.print(",");
+          }
+        }
+        Serial.println();
         
-        for(int j=4; j>=0; j--){
-          if(sampleVal>maxVals[j]){
-            for(int k=0; k<j+1; k++){
-              maxVals[k] = maxVals[k+1];
+        double x = FFT.MajorPeak(vReal, samples, samplingFrequency) * 0.50;  //0.616;
+      
+        if(distance(x, lastX)>1.0){
+          for(int j=1; j>=0; j--){
+            if(x>maxVals[j]){ //discourages multiple
+              for(int k=0; k<j+1; k++){
+                maxVals[k] = maxVals[k+1];
+              }
+              maxVals[j] = x;
+              break;
             }
-            maxVals[j] = sampleVal;
-            break;
           }
         }
-        Serial.println(analogRead(mic));
-        sampleTime = millis();
+        lastX = x;
+        //Serial.print(maxVals[0]);
+        //Serial.print(", ");
+       // Serial.println(maxVals[1]);
+        i=0;
       }
-      if(millis()-displayTime>500){
-        Serial.print("{");
-        for(int i=0; i<5; i++){
-          Serial.print(maxVals[i]);
-          if(i<4){
-            Serial.print(", "); 
-          }
-        }
-        Serial.println("}");
-        displayTime = millis();
-      }
+      
+
+      
       //toneDetected = true;
       break;
     case FHTProcessing: //Take FHT and compare to files
