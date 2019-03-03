@@ -110,7 +110,7 @@ void loop() {
 
         for(int j=0; j<128; j++){
           Serial.print(vReal[j]);
-          if(i!=127){
+          if(j!=127){
             Serial.print(",");
           }
         }
